@@ -125,7 +125,7 @@ app.post('/api/analyze', async (req, res) => {
         reading: token.reading,
         pronunciation: token.pronunciation
       })),
-      summary: generateSummary(tokens)
+      summary: generateSummary(tokens, text.length)
     };
     
     res.json(result);
@@ -136,26 +136,35 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 // 簡易的な統計情報を生成
-const generateSummary = (tokens) => {
+const generateSummary = (tokens, totalTextLength) => {
   const posCount = {};
   const wordFreq = {};
-  
+
   tokens.forEach(token => {
     // 品詞のカウント
     posCount[token.pos] = (posCount[token.pos] || 0) + 1;
-    
+
     // 名詞の頻度カウント（助詞等を除く）
     if (token.pos === '名詞' && token.surface_form.length > 1) {
       wordFreq[token.surface_form] = (wordFreq[token.surface_form] || 0) + 1;
     }
   });
-  
-  // 頻出語トップ10
+
+  // 頻出語トップ10（文字数と割合を計算）
   const topWords = Object.entries(wordFreq)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
-    .map(([word, count]) => ({ word, count }));
-  
+    .map(([word, count]) => {
+      const totalChars = word.length * count;
+      const percentage = ((totalChars / totalTextLength) * 100).toFixed(2);
+      return {
+        word,
+        count,
+        totalChars,
+        percentage: parseFloat(percentage)
+      };
+    });
+
   return {
     posCount,
     topWords

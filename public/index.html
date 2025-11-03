@@ -342,7 +342,9 @@
                 wordItem.className = 'word-item';
                 wordItem.innerHTML = `
                     <span>${item.word}</span>
-                    <span class="word-count">${item.count}</span>
+                    <span class="word-count">${item.count}回</span>
+                    <span class="word-count">${item.totalChars}文字</span>
+                    <span class="word-count">${item.percentage}%</span>
                 `;
                 wordCloud.appendChild(wordItem);
             });
