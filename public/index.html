@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webページ形態素解析ツール</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        
+        #urlInput {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        #urlInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            padding: 12px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fee;
+            border-left: 4px solid #f44;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        .error.show {
+            display: block;
+        }
+        
+        .results {
+            display: none;
+        }
+        
+        .results.show {
+            display: block;
+        }
+        
+        .result-section {
+            margin-bottom: 30px;
+        }
+        
+        .result-section h2 {
+            color: #667eea;
+            font-size: 20px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .info-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .info-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .token-table {
+            width: 100%;
+            border-collapse: collapse;
+            overflow-x: auto;
+            display: block;
+        }
+        
+        .token-table thead {
+            background: #667eea;
+            color: white;
+        }
+        
+        .token-table th,
+        .token-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .token-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .word-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .word-item {
+            background: #667eea;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .word-count {
+            background: rgba(255,255,255,0.3);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Webページ形態素解析ツール</h1>
+        <p class="subtitle">URLを入力してWebページの日本語テキストを形態素解析します</p>
+        
+        <div class="input-group">
+            <input 
+                type="text" 
+                id="urlInput" 
+                placeholder="https://example.com"
+                value="https://www.nhk.or.jp/"
+            >
+            <button id="analyzeBtn" onclick="analyzeUrl()">解析開始</button>
+        </div>
+        
+        <div class="error" id="errorMsg"></div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>解析中です。しばらくお待ちください...</p>
+        </div>
+        
+        <div class="results" id="results">
+            <div class="result-section">
+                <h2>📊 基本情報</h2>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <div class="info-label">ページタイトル</div>
+                        <div class="info-value" id="pageTitle">-</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">テキスト長</div>
+                        <div class="info-value" id="textLength">-</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">形態素数</div>
+                        <div class="info-value" id="tokenCount">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="result-section">
+                <h2>🏷️ 頻出単語 (TOP 10)</h2>
+                <div class="word-cloud" id="wordCloud"></div>
+            </div>
+            
+            <div class="result-section">
+                <h2>📝 形態素一覧 (最初の100件)</h2>
+                <table class="token-table">
+                    <thead>
+                        <tr>
+                            <th>表層形</th>
+                            <th>品詞</th>
+                            <th>品詞細分類1</th>
+                            <th>基本形</th>
+                            <th>読み</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tokenTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function analyzeUrl() {
+            const url = document.getElementById('urlInput').value.trim();
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const errorMsg = document.getElementById('errorMsg');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            
+            // リセット
+            errorMsg.classList.remove('show');
+            results.classList.remove('show');
+            loading.classList.add('show');
+            analyzeBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'エラーが発生しました');
+                }
+                
+                displayResults(data);
+                results.classList.add('show');
+                
+            } catch (error) {
+                errorMsg.textContent = error.message;
+                errorMsg.classList.add('show');
+            } finally {
+                loading.classList.remove('show');
+                analyzeBtn.disabled = false;
+            }
+        }
+        
+        function displayResults(data) {
+            // 基本情報
+            document.getElementById('pageTitle').textContent = data.title || '-';
+            document.getElementById('textLength').textContent = data.textLength.toLocaleString() + '文字';
+            document.getElementById('tokenCount').textContent = data.tokenCount.toLocaleString() + '語';
+            
+            // 頻出単語
+            const wordCloud = document.getElementById('wordCloud');
+            wordCloud.innerHTML = '';
+            data.summary.topWords.forEach(item => {
+                const wordItem = document.createElement('div');
+                wordItem.className = 'word-item';
+                wordItem.innerHTML = `
+                    <span>${item.word}</span>
+                    <span class="word-count">${item.count}</span>
+                `;
+                wordCloud.appendChild(wordItem);
+            });
+            
+            // 形態素一覧
+            const tbody = document.getElementById('tokenTableBody');
+            tbody.innerHTML = '';
+            data.tokens.forEach(token => {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = token.surface;
+                row.insertCell(1).textContent = token.pos;
+                row.insertCell(2).textContent = token.posDetail1;
+                row.insertCell(3).textContent = token.baseForm;
+                row.insertCell(4).textContent = token.reading || '-';
+            });
+        }
+        
+        // Enterキーで解析開始
+        document.getElementById('urlInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                analyzeUrl();
+            }
+        });
+    </script>
+</body>
+</html>
