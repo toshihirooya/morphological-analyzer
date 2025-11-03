@@ -44,20 +44,41 @@ const fetchWebPage = async (url) => {
     });
     
     const $ = cheerio.load(response.data);
-    
-    // スクリプトとスタイルを除去
+
+    // 不要な要素を除去
     $('script').remove();
     $('style').remove();
-    
+    $('noscript').remove();
+    $('iframe').remove();
+    $('nav').remove();
+    $('header').remove();
+    $('footer').remove();
+    $('aside').remove();
+
     // テキストコンテンツを抽出
     const title = $('title').text().trim();
-    const bodyText = $('body').text()
+    let bodyText = $('body').text();
+
+    // HTMLタグを除去（念のため）
+    bodyText = bodyText.replace(/<[^>]*>/g, '');
+
+    // HTMLエンティティをデコード
+    bodyText = bodyText
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'");
+
+    // 連続する空白を1つに統一
+    bodyText = bodyText
       .replace(/\s+/g, ' ')
       .trim();
-    
+
     return {
       title,
-      text: bodyText.substring(0, 5000) // 最大5000文字に制限
+      text: bodyText
     };
   } catch (error) {
     throw new Error(`Webページの取得に失敗しました: ${error.message}`);
@@ -91,9 +112,10 @@ app.post('/api/analyze', async (req, res) => {
     const result = {
       url,
       title,
+      bodyText: text,
       textLength: text.length,
       tokenCount: tokens.length,
-      tokens: tokens.slice(0, 100).map(token => ({
+      tokens: tokens.map(token => ({
         surface: token.surface_form,
         pos: token.pos,
         posDetail1: token.pos_detail_1,

@@ -252,12 +252,22 @@
             </div>
             
             <div class="result-section">
+                <h2>📄 抽出されたテキスト</h2>
+                <div id="bodyText" style="line-height: 1.8; font-size: 14px; padding: 20px; background: #f8f9fa; border-radius: 5px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0;"></div>
+            </div>
+
+            <div class="result-section">
                 <h2>🏷️ 頻出単語 (TOP 10)</h2>
                 <div class="word-cloud" id="wordCloud"></div>
             </div>
-            
+
             <div class="result-section">
-                <h2>📝 形態素一覧 (最初の100件)</h2>
+                <h2>📝 形態素解析結果 (スラッシュ区切り)</h2>
+                <div id="tokenDisplay" style="line-height: 2; font-size: 16px; padding: 20px; background: #f8f9fa; border-radius: 5px; word-wrap: break-word;"></div>
+            </div>
+
+            <div class="result-section">
+                <h2>📋 形態素詳細（全件）</h2>
                 <table class="token-table">
                     <thead>
                         <tr>
@@ -320,7 +330,10 @@
             document.getElementById('pageTitle').textContent = data.title || '-';
             document.getElementById('textLength').textContent = data.textLength.toLocaleString() + '文字';
             document.getElementById('tokenCount').textContent = data.tokenCount.toLocaleString() + '語';
-            
+
+            // 抽出されたテキスト
+            document.getElementById('bodyText').textContent = data.bodyText || '';
+
             // 頻出単語
             const wordCloud = document.getElementById('wordCloud');
             wordCloud.innerHTML = '';
@@ -333,8 +346,13 @@
                 `;
                 wordCloud.appendChild(wordItem);
             });
-            
-            // 形態素一覧
+
+            // スラッシュ区切りの形態素解析結果
+            const tokenDisplay = document.getElementById('tokenDisplay');
+            const slashDelimited = data.tokens.map(token => token.surface).join(' / ');
+            tokenDisplay.textContent = slashDelimited;
+
+            // 形態素一覧（テーブル）
             const tbody = document.getElementById('tokenTableBody');
             tbody.innerHTML = '';
             data.tokens.forEach(token => {
