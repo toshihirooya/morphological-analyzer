@@ -214,15 +214,33 @@
     <div class="container">
         <h1>🔍 Webページ形態素解析ツール</h1>
         <p class="subtitle">URLを入力してWebページの日本語テキストを形態素解析します</p>
-        
-        <div class="input-group">
-            <input 
-                type="text" 
-                id="urlInput" 
+
+        <div style="margin-bottom: 20px;">
+            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <input type="radio" name="inputMode" value="single" checked onchange="switchInputMode()">
+                <span>単一URL</span>
+                <input type="radio" name="inputMode" value="multiple" onchange="switchInputMode()">
+                <span>複数URL（最大20件）</span>
+            </label>
+        </div>
+
+        <div id="singleUrlInput" class="input-group">
+            <input
+                type="text"
+                id="urlInput"
                 placeholder="https://example.com"
                 value="https://www.nhk.or.jp/"
             >
             <button id="analyzeBtn" onclick="analyzeUrl()">解析開始</button>
+        </div>
+
+        <div id="multipleUrlInput" class="input-group" style="display: none; flex-direction: column;">
+            <textarea
+                id="urlsTextarea"
+                placeholder="URLを1行に1つずつ入力してください（最大20件）&#10;例:&#10;https://example1.com&#10;https://example2.com&#10;https://example3.com"
+                style="width: 100%; min-height: 200px; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px; font-family: monospace; resize: vertical;"
+            ></textarea>
+            <button id="analyzeMultipleBtn" onclick="analyzeMultipleUrls()" style="margin-top: 10px; align-self: flex-end;">一括解析開始</button>
         </div>
         
         <div class="error" id="errorMsg"></div>
@@ -285,19 +303,40 @@
     </div>
     
     <script>
+        function switchInputMode() {
+            const mode = document.querySelector('input[name="inputMode"]:checked').value;
+            const singleUrlInput = document.getElementById('singleUrlInput');
+            const multipleUrlInput = document.getElementById('multipleUrlInput');
+            const results = document.getElementById('results');
+            const errorMsg = document.getElementById('errorMsg');
+
+            if (mode === 'single') {
+                singleUrlInput.style.display = 'flex';
+                multipleUrlInput.style.display = 'none';
+            } else {
+                singleUrlInput.style.display = 'none';
+                multipleUrlInput.style.display = 'flex';
+            }
+
+            // 結果とエラーをクリア
+            results.classList.remove('show');
+            errorMsg.classList.remove('show');
+        }
+
         async function analyzeUrl() {
             const url = document.getElementById('urlInput').value.trim();
             const loading = document.getElementById('loading');
             const results = document.getElementById('results');
             const errorMsg = document.getElementById('errorMsg');
             const analyzeBtn = document.getElementById('analyzeBtn');
-            
+
             // リセット
             errorMsg.classList.remove('show');
             results.classList.remove('show');
             loading.classList.add('show');
+            loading.innerHTML = '<div class="spinner"></div><p>解析中です。しばらくお待ちください...</p>';
             analyzeBtn.disabled = true;
-            
+
             try {
                 const response = await fetch('/api/analyze', {
                     method: 'POST',
@@ -306,22 +345,83 @@
                     },
                     body: JSON.stringify({ url })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (!response.ok) {
                     throw new Error(data.error || 'エラーが発生しました');
                 }
-                
+
                 displayResults(data);
                 results.classList.add('show');
-                
+
             } catch (error) {
                 errorMsg.textContent = error.message;
                 errorMsg.classList.add('show');
             } finally {
                 loading.classList.remove('show');
                 analyzeBtn.disabled = false;
+            }
+        }
+
+        async function analyzeMultipleUrls() {
+            const urlsText = document.getElementById('urlsTextarea').value.trim();
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const errorMsg = document.getElementById('errorMsg');
+            const analyzeMultipleBtn = document.getElementById('analyzeMultipleBtn');
+
+            if (!urlsText) {
+                errorMsg.textContent = 'URLを入力してください';
+                errorMsg.classList.add('show');
+                return;
+            }
+
+            const urls = urlsText.split('\n').map(url => url.trim()).filter(url => url);
+
+            if (urls.length === 0) {
+                errorMsg.textContent = 'URLを入力してください';
+                errorMsg.classList.add('show');
+                return;
+            }
+
+            if (urls.length > 20) {
+                errorMsg.textContent = 'URLは最大20件までです';
+                errorMsg.classList.add('show');
+                return;
+            }
+
+            // リセット
+            errorMsg.classList.remove('show');
+            results.classList.remove('show');
+            loading.classList.add('show');
+            loading.innerHTML = `<div class="spinner"></div><p>${urls.length}件のURLを解析中です。しばらくお待ちください...</p>`;
+            analyzeMultipleBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/analyze-multiple', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ urls })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'エラーが発生しました');
+                }
+
+                displayMultipleResults(data);
+                results.classList.add('show');
+
+            } catch (error) {
+                errorMsg.textContent = error.message;
+                errorMsg.classList.add('show');
+            } finally {
+                loading.classList.remove('show');
+                analyzeMultipleBtn.disabled = false;
             }
         }
         
@@ -367,6 +467,129 @@
             });
         }
         
+        function displayMultipleResults(data) {
+            // 結果コンテナを初期化
+            const results = document.getElementById('results');
+            results.innerHTML = '';
+
+            // サマリー情報を表示
+            const summarySection = document.createElement('div');
+            summarySection.className = 'result-section';
+            summarySection.innerHTML = `
+                <h2>📊 統合サマリー</h2>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <div class="info-label">解析成功</div>
+                        <div class="info-value">${data.successCount}件</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">解析失敗</div>
+                        <div class="info-value">${data.errorCount}件</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">総文字数</div>
+                        <div class="info-value">${data.aggregatedSummary.totalTextLength.toLocaleString()}文字</div>
+                    </div>
+                </div>
+            `;
+            results.appendChild(summarySection);
+
+            // 統合頻出単語を表示
+            const wordSection = document.createElement('div');
+            wordSection.className = 'result-section';
+            wordSection.innerHTML = `
+                <h2>🏷️ 統合頻出単語 (TOP 20)</h2>
+                <table class="token-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">順位</th>
+                            <th>単語</th>
+                            <th>出現サイト数</th>
+                            <th>サイト割合</th>
+                            <th>出現回数</th>
+                            <th>文字割合</th>
+                        </tr>
+                    </thead>
+                    <tbody id="aggregatedWordTableBody"></tbody>
+                </table>
+            `;
+            results.appendChild(wordSection);
+
+            const tbody = document.getElementById('aggregatedWordTableBody');
+            data.aggregatedSummary.topWords.forEach((item, index) => {
+                const row = tbody.insertRow();
+                row.insertCell(0).textContent = index + 1;
+                row.insertCell(1).textContent = item.word;
+                row.insertCell(2).textContent = `${item.siteCount}/${data.aggregatedSummary.totalSites}`;
+                row.insertCell(3).textContent = `${item.sitePercentage}%`;
+                row.insertCell(4).textContent = `${item.count}回`;
+                row.insertCell(5).textContent = `${item.percentage}%`;
+            });
+
+            // エラーがある場合は表示
+            if (data.errors.length > 0) {
+                const errorSection = document.createElement('div');
+                errorSection.className = 'result-section';
+                errorSection.innerHTML = `
+                    <h2>⚠️ 解析失敗URL</h2>
+                    <div style="background: #fee; padding: 15px; border-radius: 5px;">
+                        ${data.errors.map(err => `
+                            <div style="margin-bottom: 10px;">
+                                <strong>${err.url}</strong>: ${err.error}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                results.appendChild(errorSection);
+            }
+
+            // 各サイトの結果を表示
+            const sitesSection = document.createElement('div');
+            sitesSection.className = 'result-section';
+            sitesSection.innerHTML = `<h2>📄 各サイトの詳細（${data.successCount}件）</h2>`;
+            results.appendChild(sitesSection);
+
+            data.results.forEach((siteData, index) => {
+                const siteDetail = document.createElement('div');
+                siteDetail.style.marginBottom = '30px';
+                siteDetail.style.padding = '20px';
+                siteDetail.style.background = '#f8f9fa';
+                siteDetail.style.borderRadius = '5px';
+                siteDetail.style.border = '1px solid #e0e0e0';
+
+                siteDetail.innerHTML = `
+                    <h3 style="color: #667eea; margin-bottom: 15px;">${index + 1}. ${siteData.title || 'タイトルなし'}</h3>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px; word-break: break-all;">${siteData.url}</p>
+                    <div class="info-grid">
+                        <div class="info-card">
+                            <div class="info-label">文字数</div>
+                            <div class="info-value">${siteData.textLength.toLocaleString()}文字</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-label">形態素数</div>
+                            <div class="info-value">${siteData.tokenCount.toLocaleString()}語</div>
+                        </div>
+                    </div>
+                    <h4 style="margin-top: 15px; margin-bottom: 10px;">頻出単語 (TOP 10)</h4>
+                    <div class="word-cloud" id="wordCloud${index}"></div>
+                `;
+                sitesSection.appendChild(siteDetail);
+
+                // 個別サイトの頻出単語を表示
+                const siteWordCloud = document.getElementById(`wordCloud${index}`);
+                siteData.summary.topWords.forEach(item => {
+                    const wordItem = document.createElement('div');
+                    wordItem.className = 'word-item';
+                    wordItem.innerHTML = `
+                        <span>${item.word}</span>
+                        <span class="word-count">${item.count}回</span>
+                        <span class="word-count">${item.percentage}%</span>
+                    `;
+                    siteWordCloud.appendChild(wordItem);
+                });
+            });
+        }
+
         // Enterキーで解析開始
         document.getElementById('urlInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
