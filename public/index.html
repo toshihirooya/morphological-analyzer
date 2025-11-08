@@ -275,8 +275,19 @@
             </div>
 
             <div class="result-section">
-                <h2>🏷️ 頻出単語 (TOP 10)</h2>
-                <div class="word-cloud" id="wordCloud"></div>
+                <h2>🏷️ タグごとの頻出単語 (TOP 10)</h2>
+
+                <h3 style="color: #667eea; font-size: 18px; margin-top: 20px; margin-bottom: 10px;">Title タグ</h3>
+                <div class="word-cloud" id="wordCloudTitle"></div>
+
+                <h3 style="color: #667eea; font-size: 18px; margin-top: 20px; margin-bottom: 10px;">H1 タグ</h3>
+                <div class="word-cloud" id="wordCloudH1"></div>
+
+                <h3 style="color: #667eea; font-size: 18px; margin-top: 20px; margin-bottom: 10px;">H2 タグ</h3>
+                <div class="word-cloud" id="wordCloudH2"></div>
+
+                <h3 style="color: #667eea; font-size: 18px; margin-top: 20px; margin-bottom: 10px;">Body タグ</h3>
+                <div class="word-cloud" id="wordCloudBody"></div>
             </div>
 
             <div class="result-section">
@@ -434,20 +445,36 @@
             // 抽出されたテキスト
             document.getElementById('bodyText').textContent = data.bodyText || '';
 
-            // 頻出単語
-            const wordCloud = document.getElementById('wordCloud');
-            wordCloud.innerHTML = '';
-            data.summary.topWords.forEach(item => {
-                const wordItem = document.createElement('div');
-                wordItem.className = 'word-item';
-                wordItem.innerHTML = `
-                    <span>${item.word}</span>
-                    <span class="word-count">${item.count}回</span>
-                    <span class="word-count">${item.totalChars}文字</span>
-                    <span class="word-count">${item.percentage}%</span>
-                `;
-                wordCloud.appendChild(wordItem);
-            });
+            // タグごとの頻出単語を表示する関数
+            const displayTagWords = (elementId, tagData) => {
+                const wordCloud = document.getElementById(elementId);
+                wordCloud.innerHTML = '';
+
+                if (!tagData || !tagData.summary || !tagData.summary.topWords || tagData.summary.topWords.length === 0) {
+                    wordCloud.innerHTML = '<p style="color: #999; font-size: 14px;">単語が見つかりませんでした</p>';
+                    return;
+                }
+
+                tagData.summary.topWords.forEach(item => {
+                    const wordItem = document.createElement('div');
+                    wordItem.className = 'word-item';
+                    wordItem.innerHTML = `
+                        <span>${item.word}</span>
+                        <span class="word-count">${item.count}回</span>
+                        <span class="word-count">${item.totalChars}文字</span>
+                        <span class="word-count">${item.percentage}%</span>
+                    `;
+                    wordCloud.appendChild(wordItem);
+                });
+            };
+
+            // 各タグの頻出単語を表示
+            if (data.byTag) {
+                displayTagWords('wordCloudTitle', data.byTag.title);
+                displayTagWords('wordCloudH1', data.byTag.h1);
+                displayTagWords('wordCloudH2', data.byTag.h2);
+                displayTagWords('wordCloudBody', data.byTag.body);
+            }
 
             // スラッシュ区切りの形態素解析結果
             const tokenDisplay = document.getElementById('tokenDisplay');
@@ -526,6 +553,173 @@
                 row.insertCell(5).textContent = `${item.percentage}%`;
             });
 
+            // タグごとの統合頻出単語を表示
+            if (data.aggregatedSummary.byTag) {
+                // Title タグ
+                const titleSection = document.createElement('div');
+                titleSection.className = 'result-section';
+                titleSection.innerHTML = `
+                    <h2>🏷️ Title タグの統合頻出単語 (TOP 20)</h2>
+                    <table class="token-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">順位</th>
+                                <th>単語</th>
+                                <th>出現サイト数</th>
+                                <th>サイト割合</th>
+                                <th>出現回数</th>
+                                <th>文字割合</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aggregatedTitleTableBody"></tbody>
+                    </table>
+                `;
+                results.appendChild(titleSection);
+
+                const titleTbody = document.getElementById('aggregatedTitleTableBody');
+                if (data.aggregatedSummary.byTag.title.topWords.length > 0) {
+                    data.aggregatedSummary.byTag.title.topWords.forEach((item, index) => {
+                        const row = titleTbody.insertRow();
+                        row.insertCell(0).textContent = index + 1;
+                        row.insertCell(1).textContent = item.word;
+                        row.insertCell(2).textContent = `${item.siteCount}/${data.aggregatedSummary.totalSites}`;
+                        row.insertCell(3).textContent = `${item.sitePercentage}%`;
+                        row.insertCell(4).textContent = `${item.count}回`;
+                        row.insertCell(5).textContent = `${item.percentage}%`;
+                    });
+                } else {
+                    const row = titleTbody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 6;
+                    cell.textContent = 'データなし';
+                    cell.style.textAlign = 'center';
+                    cell.style.color = '#999';
+                }
+
+                // H1 タグ
+                const h1Section = document.createElement('div');
+                h1Section.className = 'result-section';
+                h1Section.innerHTML = `
+                    <h2>🏷️ H1 タグの統合頻出単語 (TOP 20)</h2>
+                    <table class="token-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">順位</th>
+                                <th>単語</th>
+                                <th>出現サイト数</th>
+                                <th>サイト割合</th>
+                                <th>出現回数</th>
+                                <th>文字割合</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aggregatedH1TableBody"></tbody>
+                    </table>
+                `;
+                results.appendChild(h1Section);
+
+                const h1Tbody = document.getElementById('aggregatedH1TableBody');
+                if (data.aggregatedSummary.byTag.h1.topWords.length > 0) {
+                    data.aggregatedSummary.byTag.h1.topWords.forEach((item, index) => {
+                        const row = h1Tbody.insertRow();
+                        row.insertCell(0).textContent = index + 1;
+                        row.insertCell(1).textContent = item.word;
+                        row.insertCell(2).textContent = `${item.siteCount}/${data.aggregatedSummary.totalSites}`;
+                        row.insertCell(3).textContent = `${item.sitePercentage}%`;
+                        row.insertCell(4).textContent = `${item.count}回`;
+                        row.insertCell(5).textContent = `${item.percentage}%`;
+                    });
+                } else {
+                    const row = h1Tbody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 6;
+                    cell.textContent = 'データなし';
+                    cell.style.textAlign = 'center';
+                    cell.style.color = '#999';
+                }
+
+                // H2 タグ
+                const h2Section = document.createElement('div');
+                h2Section.className = 'result-section';
+                h2Section.innerHTML = `
+                    <h2>🏷️ H2 タグの統合頻出単語 (TOP 20)</h2>
+                    <table class="token-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">順位</th>
+                                <th>単語</th>
+                                <th>出現サイト数</th>
+                                <th>サイト割合</th>
+                                <th>出現回数</th>
+                                <th>文字割合</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aggregatedH2TableBody"></tbody>
+                    </table>
+                `;
+                results.appendChild(h2Section);
+
+                const h2Tbody = document.getElementById('aggregatedH2TableBody');
+                if (data.aggregatedSummary.byTag.h2.topWords.length > 0) {
+                    data.aggregatedSummary.byTag.h2.topWords.forEach((item, index) => {
+                        const row = h2Tbody.insertRow();
+                        row.insertCell(0).textContent = index + 1;
+                        row.insertCell(1).textContent = item.word;
+                        row.insertCell(2).textContent = `${item.siteCount}/${data.aggregatedSummary.totalSites}`;
+                        row.insertCell(3).textContent = `${item.sitePercentage}%`;
+                        row.insertCell(4).textContent = `${item.count}回`;
+                        row.insertCell(5).textContent = `${item.percentage}%`;
+                    });
+                } else {
+                    const row = h2Tbody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 6;
+                    cell.textContent = 'データなし';
+                    cell.style.textAlign = 'center';
+                    cell.style.color = '#999';
+                }
+
+                // Body タグ
+                const bodySection = document.createElement('div');
+                bodySection.className = 'result-section';
+                bodySection.innerHTML = `
+                    <h2>🏷️ Body タグの統合頻出単語 (TOP 20)</h2>
+                    <table class="token-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">順位</th>
+                                <th>単語</th>
+                                <th>出現サイト数</th>
+                                <th>サイト割合</th>
+                                <th>出現回数</th>
+                                <th>文字割合</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aggregatedBodyTableBody"></tbody>
+                    </table>
+                `;
+                results.appendChild(bodySection);
+
+                const bodyTbody = document.getElementById('aggregatedBodyTableBody');
+                if (data.aggregatedSummary.byTag.body.topWords.length > 0) {
+                    data.aggregatedSummary.byTag.body.topWords.forEach((item, index) => {
+                        const row = bodyTbody.insertRow();
+                        row.insertCell(0).textContent = index + 1;
+                        row.insertCell(1).textContent = item.word;
+                        row.insertCell(2).textContent = `${item.siteCount}/${data.aggregatedSummary.totalSites}`;
+                        row.insertCell(3).textContent = `${item.sitePercentage}%`;
+                        row.insertCell(4).textContent = `${item.count}回`;
+                        row.insertCell(5).textContent = `${item.percentage}%`;
+                    });
+                } else {
+                    const row = bodyTbody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 6;
+                    cell.textContent = 'データなし';
+                    cell.style.textAlign = 'center';
+                    cell.style.color = '#999';
+                }
+            }
+
             // エラーがある場合は表示
             if (data.errors.length > 0) {
                 const errorSection = document.createElement('div');
@@ -570,23 +764,53 @@
                             <div class="info-value">${siteData.tokenCount.toLocaleString()}語</div>
                         </div>
                     </div>
-                    <h4 style="margin-top: 15px; margin-bottom: 10px;">頻出単語 (TOP 10)</h4>
-                    <div class="word-cloud" id="wordCloud${index}"></div>
+                    <h4 style="margin-top: 15px; margin-bottom: 10px;">タグごとの頻出単語</h4>
+                    <div style="margin-bottom: 20px;">
+                        <h5 style="margin-bottom: 5px; color: #555;">Title タグ</h5>
+                        <div class="word-cloud" id="siteWordCloudTitle${index}"></div>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <h5 style="margin-bottom: 5px; color: #555;">H1 タグ</h5>
+                        <div class="word-cloud" id="siteWordCloudH1${index}"></div>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <h5 style="margin-bottom: 5px; color: #555;">H2 タグ</h5>
+                        <div class="word-cloud" id="siteWordCloudH2${index}"></div>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <h5 style="margin-bottom: 5px; color: #555;">Body タグ</h5>
+                        <div class="word-cloud" id="siteWordCloudBody${index}"></div>
+                    </div>
                 `;
                 sitesSection.appendChild(siteDetail);
 
-                // 個別サイトの頻出単語を表示
-                const siteWordCloud = document.getElementById(`wordCloud${index}`);
-                siteData.summary.topWords.forEach(item => {
-                    const wordItem = document.createElement('div');
-                    wordItem.className = 'word-item';
-                    wordItem.innerHTML = `
-                        <span>${item.word}</span>
-                        <span class="word-count">${item.count}回</span>
-                        <span class="word-count">${item.percentage}%</span>
-                    `;
-                    siteWordCloud.appendChild(wordItem);
-                });
+                // 個別サイトのタグごとの頻出単語を表示
+                const displaySiteTagWords = (elementId, tagData) => {
+                    const wordCloud = document.getElementById(elementId);
+                    if (!tagData || !tagData.summary || !tagData.summary.topWords || tagData.summary.topWords.length === 0) {
+                        wordCloud.innerHTML = '<p style="color: #999; font-size: 14px;">データなし</p>';
+                        return;
+                    }
+
+                    tagData.summary.topWords.forEach(item => {
+                        const wordItem = document.createElement('div');
+                        wordItem.className = 'word-item';
+                        wordItem.innerHTML = `
+                            <span>${item.word}</span>
+                            <span class="word-count">${item.count}回</span>
+                            <span class="word-count">${item.totalChars}文字</span>
+                            <span class="word-count">${item.percentage}%</span>
+                        `;
+                        wordCloud.appendChild(wordItem);
+                    });
+                };
+
+                if (siteData.byTag) {
+                    displaySiteTagWords(`siteWordCloudTitle${index}`, siteData.byTag.title);
+                    displaySiteTagWords(`siteWordCloudH1${index}`, siteData.byTag.h1);
+                    displaySiteTagWords(`siteWordCloudH2${index}`, siteData.byTag.h2);
+                    displaySiteTagWords(`siteWordCloudBody${index}`, siteData.byTag.body);
+                }
             });
         }
 
