@@ -220,7 +220,7 @@
                 <input type="radio" name="inputMode" value="single" checked onchange="switchInputMode()">
                 <span>単一URL</span>
                 <input type="radio" name="inputMode" value="multiple" onchange="switchInputMode()">
-                <span>複数URL（最大20件）</span>
+                <span>複数URL（最大30件）</span>
             </label>
         </div>
 
@@ -237,7 +237,7 @@
         <div id="multipleUrlInput" class="input-group" style="display: none; flex-direction: column;">
             <textarea
                 id="urlsTextarea"
-                placeholder="URLを1行に1つずつ入力してください（最大20件）&#10;例:&#10;https://example1.com&#10;https://example2.com&#10;https://example3.com"
+                placeholder="URLを1行に1つずつ入力してください（最大30件）&#10;例:&#10;https://example1.com&#10;https://example2.com&#10;https://example3.com"
                 style="width: 100%; min-height: 200px; padding: 12px; border: 2px solid #e0e0e0; border-radius: 5px; font-size: 14px; font-family: monospace; resize: vertical;"
             ></textarea>
             <button id="analyzeMultipleBtn" onclick="analyzeMultipleUrls()" style="margin-top: 10px; align-self: flex-end;">一括解析開始</button>
@@ -279,6 +279,9 @@
 
                 <h3 style="color: #667eea; font-size: 18px; margin-top: 20px; margin-bottom: 10px;">Title タグ</h3>
                 <div class="word-cloud" id="wordCloudTitle"></div>
+
+                <h3 style="color: #667eea; font-size: 18px; margin-top: 20px; margin-bottom: 10px;">Meta タグ</h3>
+                <div class="word-cloud" id="wordCloudMeta"></div>
 
                 <h3 style="color: #667eea; font-size: 18px; margin-top: 20px; margin-bottom: 10px;">H1 タグ</h3>
                 <div class="word-cloud" id="wordCloudH1"></div>
@@ -396,8 +399,8 @@
                 return;
             }
 
-            if (urls.length > 20) {
-                errorMsg.textContent = 'URLは最大20件までです';
+            if (urls.length > 30) {
+                errorMsg.textContent = 'URLは最大30件までです';
                 errorMsg.classList.add('show');
                 return;
             }
@@ -471,6 +474,7 @@
             // 各タグの頻出単語を表示
             if (data.byTag) {
                 displayTagWords('wordCloudTitle', data.byTag.title);
+                displayTagWords('wordCloudMeta', data.byTag.meta);
                 displayTagWords('wordCloudH1', data.byTag.h1);
                 displayTagWords('wordCloudH2', data.byTag.h2);
                 displayTagWords('wordCloudBody', data.byTag.body);
@@ -589,6 +593,47 @@
                     });
                 } else {
                     const row = titleTbody.insertRow();
+                    const cell = row.insertCell(0);
+                    cell.colSpan = 6;
+                    cell.textContent = 'データなし';
+                    cell.style.textAlign = 'center';
+                    cell.style.color = '#999';
+                }
+
+                // Meta タグ
+                const metaSection = document.createElement('div');
+                metaSection.className = 'result-section';
+                metaSection.innerHTML = `
+                    <h2>🏷️ Meta タグの統合頻出単語 (TOP 20)</h2>
+                    <table class="token-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">順位</th>
+                                <th>単語</th>
+                                <th>出現サイト数</th>
+                                <th>サイト割合</th>
+                                <th>出現回数</th>
+                                <th>文字割合</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aggregatedMetaTableBody"></tbody>
+                    </table>
+                `;
+                results.appendChild(metaSection);
+
+                const metaTbody = document.getElementById('aggregatedMetaTableBody');
+                if (data.aggregatedSummary.byTag.meta.topWords.length > 0) {
+                    data.aggregatedSummary.byTag.meta.topWords.forEach((item, index) => {
+                        const row = metaTbody.insertRow();
+                        row.insertCell(0).textContent = index + 1;
+                        row.insertCell(1).textContent = item.word;
+                        row.insertCell(2).textContent = `${item.siteCount}/${data.aggregatedSummary.totalSites}`;
+                        row.insertCell(3).textContent = `${item.sitePercentage}%`;
+                        row.insertCell(4).textContent = `${item.count}回`;
+                        row.insertCell(5).textContent = `${item.percentage}%`;
+                    });
+                } else {
+                    const row = metaTbody.insertRow();
                     const cell = row.insertCell(0);
                     cell.colSpan = 6;
                     cell.textContent = 'データなし';
@@ -770,6 +815,10 @@
                         <div class="word-cloud" id="siteWordCloudTitle${index}"></div>
                     </div>
                     <div style="margin-bottom: 20px;">
+                        <h5 style="margin-bottom: 5px; color: #555;">Meta タグ</h5>
+                        <div class="word-cloud" id="siteWordCloudMeta${index}"></div>
+                    </div>
+                    <div style="margin-bottom: 20px;">
                         <h5 style="margin-bottom: 5px; color: #555;">H1 タグ</h5>
                         <div class="word-cloud" id="siteWordCloudH1${index}"></div>
                     </div>
@@ -807,6 +856,7 @@
 
                 if (siteData.byTag) {
                     displaySiteTagWords(`siteWordCloudTitle${index}`, siteData.byTag.title);
+                    displaySiteTagWords(`siteWordCloudMeta${index}`, siteData.byTag.meta);
                     displaySiteTagWords(`siteWordCloudH1${index}`, siteData.byTag.h1);
                     displaySiteTagWords(`siteWordCloudH2${index}`, siteData.byTag.h2);
                     displaySiteTagWords(`siteWordCloudBody${index}`, siteData.byTag.body);

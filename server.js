@@ -71,12 +71,16 @@ const fetchWebPage = async (url) => {
 
     // タグごとにテキストを抽出
     const titleText = cleanText($('title').text());
+    const metaDescription = cleanText($('meta[name="description"]').attr('content') || '');
+    const metaKeywords = cleanText($('meta[name="keywords"]').attr('content') || '');
+    const metaText = [metaDescription, metaKeywords].filter(t => t).join(' ');
     const h1Text = cleanText($('h1').map((i, el) => $(el).text()).get().join(' '));
     const h2Text = cleanText($('h2').map((i, el) => $(el).text()).get().join(' '));
     const bodyText = cleanText($('body').text());
 
     return {
       title: titleText,
+      meta: metaText,
       h1: h1Text,
       h2: h2Text,
       body: bodyText,
@@ -128,6 +132,7 @@ app.post('/api/analyze', async (req, res) => {
 
     // タグごとの解析結果
     const titleAnalysis = analyzeTag(pageData.title);
+    const metaAnalysis = analyzeTag(pageData.meta);
     const h1Analysis = analyzeTag(pageData.h1);
     const h2Analysis = analyzeTag(pageData.h2);
     const bodyAnalysis = analyzeTag(pageData.body);
@@ -160,6 +165,12 @@ app.post('/api/analyze', async (req, res) => {
           textLength: pageData.title.length,
           tokenCount: titleAnalysis.tokens.length,
           summary: titleAnalysis.summary
+        },
+        meta: {
+          text: pageData.meta,
+          textLength: pageData.meta.length,
+          tokenCount: metaAnalysis.tokens.length,
+          summary: metaAnalysis.summary
         },
         h1: {
           text: pageData.h1,
@@ -198,8 +209,8 @@ app.post('/api/analyze-multiple', async (req, res) => {
       return res.status(400).json({ error: 'URLリストが指定されていません' });
     }
 
-    if (urls.length > 20) {
-      return res.status(400).json({ error: 'URLは最大20件までです' });
+    if (urls.length > 30) {
+      return res.status(400).json({ error: 'URLは最大30件までです' });
     }
 
     // トークナイザーの初期化
@@ -243,6 +254,7 @@ app.post('/api/analyze-multiple', async (req, res) => {
 
         // タグごとの解析結果
         const titleAnalysis = analyzeTag(pageData.title);
+        const metaAnalysis = analyzeTag(pageData.meta);
         const h1Analysis = analyzeTag(pageData.h1);
         const h2Analysis = analyzeTag(pageData.h2);
         const bodyAnalysis = analyzeTag(pageData.body);
@@ -274,6 +286,12 @@ app.post('/api/analyze-multiple', async (req, res) => {
               textLength: pageData.title.length,
               tokenCount: titleAnalysis.tokens.length,
               summary: titleAnalysis.summary
+            },
+            meta: {
+              text: pageData.meta,
+              textLength: pageData.meta.length,
+              tokenCount: metaAnalysis.tokens.length,
+              summary: metaAnalysis.summary
             },
             h1: {
               text: pageData.h1,
@@ -359,6 +377,7 @@ const generateAggregatedSummary = (results) => {
   const wordFreq = {};
   const tagWordFreq = {
     title: {},
+    meta: {},
     h1: {},
     h2: {},
     body: {}
@@ -366,6 +385,7 @@ const generateAggregatedSummary = (results) => {
   let totalTextLength = 0;
   const tagTextLength = {
     title: 0,
+    meta: 0,
     h1: 0,
     h2: 0,
     body: 0
@@ -391,7 +411,7 @@ const generateAggregatedSummary = (results) => {
     });
 
     // タグごとの単語集計
-    ['title', 'h1', 'h2', 'body'].forEach(tagName => {
+    ['title', 'meta', 'h1', 'h2', 'body'].forEach(tagName => {
       if (result.byTag && result.byTag[tagName]) {
         tagTextLength[tagName] += result.byTag[tagName].textLength;
 
@@ -412,17 +432,8 @@ const generateAggregatedSummary = (results) => {
     });
   });
 
-  // 頻出語トップ20（サイト数順、次に出現回数順）
+  // 頻出語トップ20（サイト数順、次に文字割合順）
   const topWords = Object.entries(wordFreq)
-    .sort((a, b) => {
-      // まずサイト数で降順ソート
-      if (b[1].sites.size !== a[1].sites.size) {
-        return b[1].sites.size - a[1].sites.size;
-      }
-      // サイト数が同じ場合は出現回数でソート
-      return b[1].count - a[1].count;
-    })
-    .slice(0, 20)
     .map(([word, data]) => {
       const totalChars = word.length * data.count;
       const percentage = ((totalChars / totalTextLength) * 100).toFixed(2);
@@ -435,18 +446,20 @@ const generateAggregatedSummary = (results) => {
         totalChars,
         percentage: parseFloat(percentage)
       };
-    });
+    })
+    .sort((a, b) => {
+      // まずサイト数で降順ソート
+      if (b.siteCount !== a.siteCount) {
+        return b.siteCount - a.siteCount;
+      }
+      // サイト数が同じ場合は文字割合でソート
+      return b.percentage - a.percentage;
+    })
+    .slice(0, 20);
 
   // タグごとの頻出語トップ20を生成
   const generateTagTopWords = (tagName) => {
     return Object.entries(tagWordFreq[tagName])
-      .sort((a, b) => {
-        if (b[1].sites.size !== a[1].sites.size) {
-          return b[1].sites.size - a[1].sites.size;
-        }
-        return b[1].count - a[1].count;
-      })
-      .slice(0, 20)
       .map(([word, data]) => {
         const totalChars = word.length * data.count;
         const percentage = tagTextLength[tagName] > 0
@@ -461,7 +474,16 @@ const generateAggregatedSummary = (results) => {
           totalChars,
           percentage: parseFloat(percentage)
         };
-      });
+      })
+      .sort((a, b) => {
+        // まずサイト数で降順ソート
+        if (b.siteCount !== a.siteCount) {
+          return b.siteCount - a.siteCount;
+        }
+        // サイト数が同じ場合は文字割合でソート
+        return b.percentage - a.percentage;
+      })
+      .slice(0, 20);
   };
 
   return {
@@ -472,6 +494,10 @@ const generateAggregatedSummary = (results) => {
       title: {
         totalTextLength: tagTextLength.title,
         topWords: generateTagTopWords('title')
+      },
+      meta: {
+        totalTextLength: tagTextLength.meta,
+        topWords: generateTagTopWords('meta')
       },
       h1: {
         totalTextLength: tagTextLength.h1,
